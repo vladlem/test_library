@@ -1,55 +1,60 @@
-class Api::V1::UsersController < ApplicationController
-  before_action :authorize_request, except: :create
-  before_action :find_user, except: %i[create index]
+class Api::Admin::UsersController < Api::Admin::ApiController
+  before_action :find_user, except: %i[create index update]
 
   def index
-    require_ability!('ADMIN')
-
-    users = User.all
+    users = User.select(:username, :email, :user_type).all
     render json: users, status: :ok
   end
 
   def show
-    require_ability!('ADMIN')
-    render json: @user, status: :ok
+    if @reult.message.present?
+      render json: { errors: @result.message }, status: :not_found
+    else
+      render json: @result.user, status: :ok
+    end
   end
 
   def create
-    require_ability!('ADMIN')
-
-    user = User.new(user_params)
-    if user.save
-      render json: {}, status: :ok
+    result = Services::UserCreate.call(
+      username: user_params[:username],
+      email: user_params[:email],
+      user_type: user_params[:user_type],
+      password: user_params[:password],
+      password_confirmation: user_params[:password_confirmation]
+    )
+    if result.message.present?
+      render json: { errors: result.message }, status: :not_found
     else
-      render json: { errors: ['Internal server error. Unable to create a user.'] }, status: :internal_server_error
+      render json: result.user, status: :ok
     end
   end
 
   def update
-    require_ability!('ADMIN')
-
-    if @user.update(user_params)
-      render json: {}, status: :ok
+    result = Services::UserSearch.call(
+      user_type: user_params[:user_type],
+      username: user_params[:username],
+      email: user_params[:email],
+      password: user_params[:password]
+    )
+    if result.message.present?
+      render json: { errors: result.message }, status: :not_found
     else
-      render json: { errors: ['Internal server error. Unable to save current user.'] }, status: :internal_server_error
+      render json: result.user, status: :ok
     end
   end
 
   def destroy
-    require_ability!('MANAGE_USERS_CREATE')
-    @user.destroy
+    user = @result.user
+    user.destroy
   end
 
   private
 
   def find_user
-    @user = User.find_by(username: user_params[:username])
-    render json: { errors: 'User not found' }, status: :not_found unless @user
+    @result = Services::UserSearch.call(id: user_params[:id], username: user_params[:username], email: user_params[:email])
   end
 
   def user_params
-    params.permit(
-        :id, :name, :username, :email, :type, :password, :password_confirmation
-    )
+    params.permit(:id, :username, :email, :user_type, :password, :password_confirmation)
   end
 end

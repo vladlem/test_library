@@ -1,5 +1,5 @@
 module Services
-  class SearchBook < Base
+  class BookSearch < Base
     def call
       books_scope = if context.id.present?
           Book.where(id: context.id)
@@ -9,6 +9,9 @@ module Services
           Book.where(name: conext.name)
         elsif context.author.present?
           Book.where(author: context.author)
+        else
+          #TODO need refactoring
+          Book.where('1 = 0')
         end
 
       books = books_scope.pluck(:id, :name, :author)
